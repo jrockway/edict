@@ -203,6 +203,26 @@ func TestParseKey(t *testing.T) {
 	}
 }
 
+func TestFixKey(t *testing.T) {
+	testData := []struct {
+		in string
+		out string
+	}{
+		{"foo(bar) (baz) (quux)", "foo"},
+		{"foo(bar)", "foo"},
+		{"foo", "foo"},
+	}
+
+	for _, test := range testData {
+		got := fixKey(test.in)
+
+		if got != test.out {
+			t.Errorf("fixing key %s:\n  got %s\n want: %s\n", test.in, got, test.out)
+		}
+	}
+
+}
+
 func TestParseLine(t *testing.T) {
 	testData := []struct {
 		input  string

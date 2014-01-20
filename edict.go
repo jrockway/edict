@@ -229,6 +229,14 @@ func parseKey(key string) (kanji []string, kana []string, err error) {
 	return
 }
 
+func fixKey(key string) string {
+	if strings.ContainsRune(key, '(') {
+		parts := strings.Split(key, "(")
+		return parts[0]
+	}
+	return key
+}
+
 func parseLine(line string) (Entry, error) {
 	result := Entry{}
 	parts := strings.Split(line, "/")
@@ -296,6 +304,17 @@ func parseLine(line string) (Entry, error) {
 	if len(parts) <= 4 {
 		result.Information = result.Gloss[0].Information
 		result.Gloss[0].Information = []Detail{}
+	}
+
+
+	// TODO(jrockway): Kanji and Kana keys can also contain (information) identifiers like
+	// entries and glosses.  For now, just remove those, though they are valuable.  (Showing the
+	// most common reading, for example.)
+	for i, kanji := range result.Kanji {
+		result.Kanji[i] = fixKey(kanji)
+	}
+	for i, kana := range result.Kana {
+		result.Kana[i] = fixKey(kana)
 	}
 
 	return result, nil
