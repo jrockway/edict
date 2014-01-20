@@ -78,10 +78,10 @@ var (
 type parseGlossState int
 
 const (
-	start parseGlossState = iota
-	capture
-	closed
-	definition
+	start_gs parseGlossState = iota
+	capture_gs
+	closed_gs
+	definition_gs
 )
 
 func parseIdentifier(s string) (*Detail, *string, *string) {
@@ -106,24 +106,24 @@ func parseGloss(gloss string) (def string, details []Detail, xrefs []string, err
 	// not a ).  Upon reaching the ), we then transition to closed.  In the closed state, we
 	// look for a space, and finding it, transition to start.  At the end of the loop, we must
 	// be in the definition-capture state.  If not, we raise an error.
-	state := start
+	state := start_gs
 	captured := make([]rune, 0, len(gloss))
 	defcapture := make([]rune, 0, len(gloss))
 
 	for idx, c := range gloss {
 		switch state {
-		case start:
+		case start_gs:
 			if c == '(' {
-				state = capture
+				state = capture_gs
 			} else {
-				state = definition
+				state = definition_gs
 				defcapture = append(defcapture, c)
 			}
-		case definition:
+		case definition_gs:
 			defcapture = append(defcapture, c)
-		case capture:
+		case capture_gs:
 			if c == ')' {
-				state = closed
+				state = closed_gs
 				d, x, u := parseIdentifier(string(captured))
 
 				if d != nil {
@@ -136,15 +136,15 @@ func parseGloss(gloss string) (def string, details []Detail, xrefs []string, err
 						defcapture = append(defcapture, c)
 					}
 					defcapture = append(defcapture, ')')
-					state = definition
+					state = definition_gs
 				}
 				captured = make([]rune, 0, len(gloss)-idx)
 			} else {
 				captured = append(captured, c)
 			}
-		case closed:
+		case closed_gs:
 			if c == ' ' {
-				state = start
+				state = start_gs
 			} else {
 				err = fmt.Errorf("unexpected '%c' while in closed state (expecting space)", c)
 			}
@@ -153,7 +153,7 @@ func parseGloss(gloss string) (def string, details []Detail, xrefs []string, err
 		}
 	}
 
-	if state != definition {
+	if state != definition_gs {
 		err = fmt.Errorf("not in definition state after parsing:\ndetails=%v, xref=%v, def=%s", details, xrefs, def)
 		return
 	}
@@ -163,18 +163,69 @@ func parseGloss(gloss string) (def string, details []Detail, xrefs []string, err
 	return
 }
 
+type parseKeyState int
+
+const (
+	kanji_ks parseKeyState = iota
+	space_ks
+	kana_ks
+	done_ks
+)
+
 func parseKey(key string) (kanji []string, kana []string, err error) {
-	// Parse the first part into Kanji/Kana fields.
-	keyParts := parseKeys.FindStringSubmatch(key)
-	if len(keyParts) == 0 {
-		kanji = strings.Split(key, ";")
-	} else if keyParts[0] != key || len(keyParts) != 3 {
-		err = fmt.Errorf("incomplete match on key '%s':\n got '%v'", key, keyParts)
-		return
-	} else {
-		kanji = strings.Split(keyParts[1], ";")
-		kana = strings.Split(keyParts[2], ";")
+	key = strings.TrimSpace(key)
+
+	kanji = make([]string, 0, 5)
+	kana = make([]string, 0, 5)
+
+	capture := make([]rune, 0, len(key))
+	state := kanji_ks
+
+	// This is a state machine to parse the key field.  Keys look like:
+	// KANJI1;KANJI2;... [KANA1;KANA2;...]
+	// KANJI1;KANJI2;...
+	for idx, c := range key {
+		if c == ';' || state == kana_ks && c == ']' || state == kanji_ks && c == ' ' {
+			// We've just seen a record terminator; ';' for the next element, ']' for
+			// the last kana, or ' ' for the switch from kanji to kana.
+			if state == kanji_ks {
+				kanji = append(kanji, string(capture))
+				if c == ' ' {
+					state = space_ks
+				}
+			} else if state == kana_ks {
+				kana = append(kana, string(capture))
+				if c == ']' {
+					state = done_ks
+				}
+			}
+			capture = make([]rune, 0, len(key)-idx)
+		} else if c == ' ' && state == space_ks {
+			// another space?  ignore.o
+		} else if c == '[' && state == space_ks {
+			// If we just saw a space and now see a [, we know it's time to start
+			// accumulating kana.
+			state = kana_ks
+		} else {
+			// By default, we capture the character.
+			capture = append(capture, c)
+		}
 	}
+	if state == kanji_ks {
+		kanji = append(kanji, string(capture))
+		capture = make([]rune, 0, 0)
+		state = done_ks
+	}
+
+	if !(state == done_ks || state == space_ks) {
+		err = fmt.Errorf("not in done or space state (in %v) after parsing key %s", state, key)
+		return
+	}
+
+	if len(capture) != 0 {
+		err = fmt.Errorf("chars still in capture buffer after parsing %s! %v (state=%v)", key, capture, state)
+	}
+
 	return
 }
 
@@ -194,7 +245,7 @@ func parseLine(line string) (Entry, error) {
 		result.Sequence = strings.TrimSuffix(result.Sequence, "X")
 	}
 
-	var err error;
+	var err error
 	result.Kanji, result.Kana, err = parseKey(parts[0])
 	if err != nil {
 		return result, err

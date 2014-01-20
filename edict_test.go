@@ -139,6 +139,70 @@ func TestParseGloss(t *testing.T) {
 	}
 }
 
+func TestParseKey(t *testing.T) {
+	testData := []struct {
+		input  string
+		kanji  []string
+		kana   []string
+		errors bool
+	}{
+		{
+			input:  "A;B;C [x;y;z]",
+			kanji:  []string{"A", "B", "C"},
+			kana:   []string{"x", "y", "z"},
+			errors: false,
+		},
+		{
+			input:  "A [x]",
+			kanji:  []string{"A"},
+			kana:   []string{"x"},
+			errors: false,
+		},
+		{
+			input:  "A",
+			kanji:  []string{"A"},
+			kana:   []string{},
+			errors: false,
+		},
+		{
+			input:  "A;B",
+			kanji:  []string{"A", "B"},
+			kana:   []string{},
+			errors: false,
+		},
+		{
+			input:  "A;B  [C;D]",
+			kanji:  []string{"A", "B"},
+			kana:   []string{"C", "D"},
+			errors: false,
+		},
+		{
+			input:  "A;B [C",
+			kanji:  []string{"A", "B"},
+			kana:   []string{},
+			errors: true,
+		},
+	}
+
+	for _, test := range testData {
+		kanji, kana, err := parseKey(test.input)
+
+		if err != nil && !test.errors {
+			t.Errorf("%s: unexpected error: %s", test.input, err)
+			continue
+		} else if err == nil && test.errors {
+			t.Errorf("%s: got success but expected error", test.input)
+		}
+
+		if !reflect.DeepEqual(kanji, test.kanji) {
+			t.Errorf("%s: bad kanji:\n  got %v\n  want %v", test.input, kanji, test.kanji)
+		}
+		if !reflect.DeepEqual(kana, test.kana) {
+			t.Errorf("%s: bad kana:\n  got %v\n  want %v", test.input, kana, test.kana)
+		}
+	}
+}
+
 func TestParse(t *testing.T) {
 	input := []string{ // These are the first few entries from edict2.
 		"刖 [げつ] /(n) (arch) (obsc) (See 剕) cutting off the leg at the knee (form of punishment in ancient China)/EntL2542160/",
