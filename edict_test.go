@@ -203,29 +203,6 @@ func TestParseKey(t *testing.T) {
 	}
 }
 
-func TestParse(t *testing.T) {
-	input := []string{ // These are the first few entries from edict2.
-		"刖 [げつ] /(n) (arch) (obsc) (See 剕) cutting off the leg at the knee (form of punishment in ancient China)/EntL2542160/",
-		"剕 [あしきり] /(n) (arch) (See 五刑) cutting off the leg at the knee (form of punishment in ancient China)/EntL2542150/",
-		"劓 [はなきり] /(n) (arch) (See 五刑) cutting off the nose (form of punishment in ancient China)/EntL2542140/",
-		"匜;半挿 [はそう;はぞう] /(n) (1) (esp. ) wide-mouthed ceramic vessel having a small hole in its spherical base (into which bamboo was probably inserted to pour liquids)/(2) (See 半挿・はんぞう・1) teapot-like object made typically of lacquerware and used to pour hot and cold liquids/EntL2791750/",
-		"咖哩(ateji) [カレー(P);カリー] /(n) (1) (uk) curry/(2) (abbr) (uk) (See カレーライス) rice and curry/(P)/EntL1039140X/",
-		"嗉嚢;そ嚢 [そのう] /(n) bird's crop/bird's craw/EntL2542030/",
-		"嘈囃;そう囃 [そうざつ] /(n,vs) (obsc) (嘈囃 is sometimes read むねやけ) (See 胸焼け) heartburn/sour stomach/EntL2542040/",
-	}
-
-	reader := strings.NewReader(strings.Join(input, "\n"))
-	got, err := Parse(reader)
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(got) != len(input) {
-		t.Errorf("unexpected output size %d: expected %d", len(got), len(input))
-	}
-}
-
 func TestParseLine(t *testing.T) {
 	testData := []struct {
 		input  string
@@ -273,6 +250,29 @@ func TestParseLine(t *testing.T) {
 			t.Errorf("unexpected entry\n   got: %v\n  want: %v", got, test.expect)
 			continue
 		}
+	}
+}
+
+func TestParse(t *testing.T) {
+	input := []string{ // These are the first few entries from edict2.
+		"刖 [げつ] /(n) (arch) (obsc) (See 剕) cutting off the leg at the knee (form of punishment in ancient China)/EntL2542160/",
+		"剕 [あしきり] /(n) (arch) (See 五刑) cutting off the leg at the knee (form of punishment in ancient China)/EntL2542150/",
+		"劓 [はなきり] /(n) (arch) (See 五刑) cutting off the nose (form of punishment in ancient China)/EntL2542140/",
+		"匜;半挿 [はそう;はぞう] /(n) (1) (esp. ) wide-mouthed ceramic vessel having a small hole in its spherical base (into which bamboo was probably inserted to pour liquids)/(2) (See 半挿・はんぞう・1) teapot-like object made typically of lacquerware and used to pour hot and cold liquids/EntL2791750/",
+		"咖哩(ateji) [カレー(P);カリー] /(n) (1) (uk) curry/(2) (abbr) (uk) (See カレーライス) rice and curry/(P)/EntL1039140X/",
+		"嗉嚢;そ嚢 [そのう] /(n) bird's crop/bird's craw/EntL2542030/",
+		"嘈囃;そう囃 [そうざつ] /(n,vs) (obsc) (嘈囃 is sometimes read むねやけ) (See 胸焼け) heartburn/sour stomach/EntL2542040/",
+	}
+
+	reader := strings.NewReader(strings.Join(input, "\n"))
+	got, err := Parse(reader)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(got) != len(input) {
+		t.Errorf("unexpected output size %d: expected %d", len(got), len(input))
 	}
 }
 
