@@ -40,7 +40,7 @@ func (e Entry) String() string {
 // These lines contain the record separator as part of the entry, making the whole thing
 // signficantly more difficult to parse.  We'll skip these for now, and I'll patch the dictionary to
 // not do this :)
-var blacklist = []int{31179, 104168, 104171}
+var blacklist = []int{5189, 31179, 104168, 104171, 148763}
 
 func Parse(in io.Reader) ([]Entry, error) {
 	result := []Entry{}
@@ -139,6 +139,23 @@ func parseGloss(gloss string) (def string, details []Detail, xrefs []string, err
 					state = definition_gs
 				}
 				captured = make([]rune, 0, len(gloss)-idx)
+			} else if c == ',' {
+				// Sometimes things are grouped together, like "(n,adj-no)" instead
+				// of "(n) (adj-no)".  If we see a comma, we treat it like a ), but
+				// don't transition into a different state.
+				d, _, _ := parseIdentifier(string(captured))
+				if d != nil {
+					details = append(details, *d)
+					captured = make([]rune, 0, len(gloss)-idx)
+				} else {
+					// TODO(jrockway): We should blow up here if we get a
+					// non-detail result from parseIdentifier, but
+					// cross-references can also contain commas.  So if we get
+					// no detail, we just continue accumulating as though the
+					// comma means nothing.
+					captured = append(captured, ',')
+				}
+
 			} else {
 				captured = append(captured, c)
 			}
@@ -305,7 +322,6 @@ func parseLine(line string) (Entry, error) {
 		result.Information = result.Gloss[0].Information
 		result.Gloss[0].Information = []Detail{}
 	}
-
 
 	// TODO(jrockway): Kanji and Kana keys can also contain (information) identifiers like
 	// entries and glosses.  For now, just remove those, though they are valuable.  (Showing the

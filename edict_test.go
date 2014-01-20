@@ -93,6 +93,12 @@ func TestParseGloss(t *testing.T) {
 			xrefs:   nil,
 		},
 		{
+			input:   "(n,adj-no) foo",
+			def:     "foo",
+			details: []Detail{N, Adj_no},
+			xrefs:   nil,
+		},
+		{
 			input:   "(See foobar) foo",
 			def:     "foo",
 			details: nil,
