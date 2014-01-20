@@ -40,7 +40,7 @@ func (e Entry) String() string {
 // These lines contain the record separator as part of the entry, making the whole thing
 // signficantly more difficult to parse.  We'll skip these for now, and I'll patch the dictionary to
 // not do this :)
-var blacklist = []int{98, 31179, 104168, 104171}
+var blacklist = []int{31179, 104168, 104171}
 
 func Parse(in io.Reader) ([]Entry, error) {
 	result := []Entry{}
@@ -70,13 +70,9 @@ lines:
 
 // Regular expressions for parsing entry lines.
 var (
-	// TODO(jrockway): kanji field is optional, according to the docs.
-	// Key part looks like "key1;key2;... [reading1;reading2;...] " (note the space at the end)
+	// TODO(jrockway): kanji field is optional, according to the docs.  Key part looks like
+	// "key1;key2;... [reading1;reading2;...] " (note the space at the end)
 	parseKeys = regexp.MustCompile(`^([^[:space:]]+) \[([^\]]+)\] `)
-
-	// Format described in the doucmentation.  The presence of the trailing X indicates that an
-	// audio recording is available.
-	parseSequence = regexp.MustCompile(`(EntL\d{7})(X?)`)
 )
 
 type parseGlossState int
@@ -177,10 +173,10 @@ func parseLine(line string) (Entry, error) {
 
 	// Parse the sequence number part, since having this in the result makes misparsing lines
 	// easier to grep for.
-	seq := parts[len(parts)-2]
-	seqParts := parseSequence.FindStringSubmatch(seq)
-	if len(seqParts) != 3 || seqParts[0] != seq {
-		return result, fmt.Errorf("can't parse sequence number %s:\n got %v", seq, seqParts)
+	result.Sequence = parts[len(parts)-2]
+	if strings.HasSuffix(result.Sequence, "X") {
+		result.RecordingAvailable = true
+		result.Sequence = strings.TrimSuffix(result.Sequence, "X")
 	}
 	result.Sequence = seqParts[1]
 
