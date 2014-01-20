@@ -107,8 +107,8 @@ func parseGloss(gloss string) (def string, details []Detail, xrefs []string, err
 	// look for a space, and finding it, transition to start.  At the end of the loop, we must
 	// be in the definition-capture state.  If not, we raise an error.
 	state := start
-	captured := []rune{}
-	defcapture := []rune{}
+	captured := make([]rune, 0, len(gloss))
+	defcapture := make([]rune, 0, len(gloss))
 
 	for idx, c := range gloss {
 		switch state {
@@ -138,7 +138,7 @@ func parseGloss(gloss string) (def string, details []Detail, xrefs []string, err
 					defcapture = append(defcapture, ')')
 					state = definition
 				}
-				captured = []rune{}
+				captured = make([]rune, 0, len(gloss)-idx)
 			} else {
 				captured = append(captured, c)
 			}
