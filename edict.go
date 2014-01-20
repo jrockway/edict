@@ -163,6 +163,21 @@ func parseGloss(gloss string) (def string, details []Detail, xrefs []string, err
 	return
 }
 
+func parseKey(key string) (kanji []string, kana []string, err error) {
+	// Parse the first part into Kanji/Kana fields.
+	keyParts := parseKeys.FindStringSubmatch(key)
+	if len(keyParts) == 0 {
+		kanji = strings.Split(key, ";")
+	} else if keyParts[0] != key || len(keyParts) != 3 {
+		err = fmt.Errorf("incomplete match on key '%s':\n got '%v'", key, keyParts)
+		return
+	} else {
+		kanji = strings.Split(keyParts[1], ";")
+		kana = strings.Split(keyParts[2], ";")
+	}
+	return
+}
+
 func parseLine(line string) (Entry, error) {
 	result := Entry{}
 	parts := strings.Split(line, "/")
@@ -178,18 +193,11 @@ func parseLine(line string) (Entry, error) {
 		result.RecordingAvailable = true
 		result.Sequence = strings.TrimSuffix(result.Sequence, "X")
 	}
-	result.Sequence = seqParts[1]
 
-	// Parse the first part into Kanji/Kana fields.
-	key := parts[0]
-	keyParts := parseKeys.FindStringSubmatch(key)
-	if len(keyParts) == 0 {
-		result.Kanji = strings.Split(key, ";")
-	} else if keyParts[0] != key || len(keyParts) != 3 {
-		return result, fmt.Errorf("incomplete match on key '%s':\n got '%v'", key, keyParts)
-	} else {
-		result.Kanji = strings.Split(keyParts[1], ";")
-		result.Kana = strings.Split(keyParts[2], ";")
+	var err error;
+	result.Kanji, result.Kana, err = parseKey(parts[0])
+	if err != nil {
+		return result, err
 	}
 
 	// Next we get some details from the first gloss.
