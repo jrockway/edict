@@ -111,7 +111,7 @@ func parseGloss(gloss string) (def string, details []Detail, xrefs []string, err
 	captured := make([]rune, 0, len(gloss))
 	defcapture := make([]rune, 0, len(gloss))
 
-	for idx, c := range gloss {
+	for i, c := range gloss {
 		switch state {
 		case startGS:
 			if c == '(' {
@@ -140,7 +140,7 @@ func parseGloss(gloss string) (def string, details []Detail, xrefs []string, err
 					defcapture = append(defcapture, ')')
 					state = definitionGS
 				}
-				captured = make([]rune, 0, len(gloss)-idx)
+				captured = captured[:0]
 			} else if c == ',' {
 				// Sometimes things are grouped together, like "(n,adj-no)" instead
 				// of "(n) (adj-no)".  If we see a comma, we treat it like a ), but
@@ -148,7 +148,7 @@ func parseGloss(gloss string) (def string, details []Detail, xrefs []string, err
 				class, identifier := parseIdentifier(string(captured))
 				if class == detail {
 					details = append(details, DetailFor[identifier])
-					captured = make([]rune, 0, len(gloss)-idx)
+					captured = captured[:0]
 				} else {
 					// TODO(jrockway): We should blow up here if we get a
 					// non-detail result from parseIdentifier, but
@@ -168,7 +168,7 @@ func parseGloss(gloss string) (def string, details []Detail, xrefs []string, err
 				err = fmt.Errorf("unexpected '%c' while in closed state (expecting space)", c)
 			}
 		default:
-			err = fmt.Errorf("in unexpected state %v at byte %d '%c'", state, idx, c)
+			err = fmt.Errorf("in unexpected state %v at byte %d '%c'", state, i, c)
 		}
 	}
 
@@ -203,7 +203,7 @@ func parseKey(key string) (kanji []string, kana []string, err error) {
 	// This is a state machine to parse the key field.  Keys look like:
 	// KANJI1;KANJI2;... [KANA1;KANA2;...]
 	// KANJI1;KANJI2;...
-	for idx, c := range key {
+	for _, c := range key {
 		if c == ';' || state == kanaKS && c == ']' || state == kanjiKS && c == ' ' {
 			// We've just seen a record terminator; ';' for the next element, ']' for
 			// the last kana, or ' ' for the switch from kanji to kana.
@@ -218,7 +218,7 @@ func parseKey(key string) (kanji []string, kana []string, err error) {
 					state = doneKS
 				}
 			}
-			capture = make([]rune, 0, len(key)-idx)
+			capture = capture[:0]
 		} else if c == ' ' && state == spaceKS {
 			// another space?  ignore.
 		} else if c == '[' && state == spaceKS {
@@ -232,7 +232,7 @@ func parseKey(key string) (kanji []string, kana []string, err error) {
 	}
 	if state == kanjiKS {
 		kanji = append(kanji, string(capture))
-		capture = make([]rune, 0, 0)
+		capture = capture[:0]
 		state = doneKS
 	}
 
