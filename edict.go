@@ -5,7 +5,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -43,7 +42,8 @@ func (e Entry) String() string {
 var blacklist = []int{5189, 31179, 104168, 104171, 148763}
 
 func Parse(in io.Reader) ([]Entry, error) {
-	result := []Entry{}
+	var result []Entry
+
 	scanner := bufio.NewScanner(in)
 	line := 0
 lines:
@@ -68,34 +68,35 @@ lines:
 	return result, nil
 }
 
-// Regular expressions for parsing entry lines.
-var (
-	// TODO(jrockway): kanji field is optional, according to the docs.  Key part looks like
-	// "key1;key2;... [reading1;reading2;...] " (note the space at the end)
-	parseKeys = regexp.MustCompile(`^([^[:space:]]+) \[([^\]]+)\] `)
+type identifierClass int
+
+const (
+	none identifierClass = iota
+	xref
+	detail
+	text
 )
+
+func parseIdentifier(s string) (identifierClass, string) {
+	if _, err := strconv.Atoi(s); err == nil {
+		return none, ""
+	} else if strings.HasPrefix(s, "See ") {
+		return xref, strings.TrimPrefix(s, "See ")
+	} else if _, ok := DetailFor[s]; ok {
+		return detail, s
+	} else {
+		return text, s
+	}
+}
 
 type parseGlossState int
 
 const (
-	start_gs parseGlossState = iota
-	capture_gs
-	closed_gs
-	definition_gs
+	startGS parseGlossState = iota
+	captureGS
+	closedGS
+	definitionGS
 )
-
-func parseIdentifier(s string) (*Detail, *string, *string) {
-	if _, err := strconv.Atoi(s); err == nil {
-		return nil, nil, nil
-	} else if strings.HasPrefix(s, "See ") {
-		word := strings.TrimPrefix(s, "See ")
-		return nil, &word, nil
-	} else if detail, ok := DetailFor[s]; ok {
-		return &detail, nil, nil
-	} else {
-		return nil, nil, &s
-	}
-}
 
 func parseGloss(gloss string) (def string, details []Detail, xrefs []string, err error) {
 	gloss = strings.TrimSpace(gloss)
@@ -106,46 +107,47 @@ func parseGloss(gloss string) (def string, details []Detail, xrefs []string, err
 	// not a ).  Upon reaching the ), we then transition to closed.  In the closed state, we
 	// look for a space, and finding it, transition to start.  At the end of the loop, we must
 	// be in the definition-capture state.  If not, we raise an error.
-	state := start_gs
+	state := startGS
 	captured := make([]rune, 0, len(gloss))
 	defcapture := make([]rune, 0, len(gloss))
 
 	for idx, c := range gloss {
 		switch state {
-		case start_gs:
+		case startGS:
 			if c == '(' {
-				state = capture_gs
+				state = captureGS
 			} else {
-				state = definition_gs
+				state = definitionGS
 				defcapture = append(defcapture, c)
 			}
-		case definition_gs:
+		case definitionGS:
 			defcapture = append(defcapture, c)
-		case capture_gs:
+		case captureGS:
 			if c == ')' {
-				state = closed_gs
-				d, x, u := parseIdentifier(string(captured))
+				state = closedGS
+				class, identifier := parseIdentifier(string(captured))
 
-				if d != nil {
-					details = append(details, *d)
-				} else if x != nil {
-					xrefs = append(xrefs, *x)
-				} else if u != nil {
+				switch class {
+				case detail:
+					details = append(details, DetailFor[identifier])
+				case xref:
+					xrefs = append(xrefs, identifier)
+				case text:
 					defcapture = append(defcapture, '(')
 					for _, c := range captured {
 						defcapture = append(defcapture, c)
 					}
 					defcapture = append(defcapture, ')')
-					state = definition_gs
+					state = definitionGS
 				}
 				captured = make([]rune, 0, len(gloss)-idx)
 			} else if c == ',' {
 				// Sometimes things are grouped together, like "(n,adj-no)" instead
 				// of "(n) (adj-no)".  If we see a comma, we treat it like a ), but
 				// don't transition into a different state.
-				d, _, _ := parseIdentifier(string(captured))
-				if d != nil {
-					details = append(details, *d)
+				class, identifier := parseIdentifier(string(captured))
+				if class == detail {
+					details = append(details, DetailFor[identifier])
 					captured = make([]rune, 0, len(gloss)-idx)
 				} else {
 					// TODO(jrockway): We should blow up here if we get a
@@ -159,9 +161,9 @@ func parseGloss(gloss string) (def string, details []Detail, xrefs []string, err
 			} else {
 				captured = append(captured, c)
 			}
-		case closed_gs:
+		case closedGS:
 			if c == ' ' {
-				state = start_gs
+				state = startGS
 			} else {
 				err = fmt.Errorf("unexpected '%c' while in closed state (expecting space)", c)
 			}
@@ -170,7 +172,7 @@ func parseGloss(gloss string) (def string, details []Detail, xrefs []string, err
 		}
 	}
 
-	if state != definition_gs {
+	if state != definitionGS {
 		err = fmt.Errorf("not in definition state after parsing:\ndetails=%v, xref=%v, def=%s", details, xrefs, def)
 		return
 	}
@@ -183,10 +185,10 @@ func parseGloss(gloss string) (def string, details []Detail, xrefs []string, err
 type parseKeyState int
 
 const (
-	kanji_ks parseKeyState = iota
-	space_ks
-	kana_ks
-	done_ks
+	kanjiKS parseKeyState = iota
+	spaceKS
+	kanaKS
+	doneKS
 )
 
 func parseKey(key string) (kanji []string, kana []string, err error) {
@@ -196,45 +198,45 @@ func parseKey(key string) (kanji []string, kana []string, err error) {
 	kana = make([]string, 0, 5)
 
 	capture := make([]rune, 0, len(key))
-	state := kanji_ks
+	state := kanjiKS
 
 	// This is a state machine to parse the key field.  Keys look like:
 	// KANJI1;KANJI2;... [KANA1;KANA2;...]
 	// KANJI1;KANJI2;...
 	for idx, c := range key {
-		if c == ';' || state == kana_ks && c == ']' || state == kanji_ks && c == ' ' {
+		if c == ';' || state == kanaKS && c == ']' || state == kanjiKS && c == ' ' {
 			// We've just seen a record terminator; ';' for the next element, ']' for
 			// the last kana, or ' ' for the switch from kanji to kana.
-			if state == kanji_ks {
+			if state == kanjiKS {
 				kanji = append(kanji, string(capture))
 				if c == ' ' {
-					state = space_ks
+					state = spaceKS
 				}
-			} else if state == kana_ks {
+			} else if state == kanaKS {
 				kana = append(kana, string(capture))
 				if c == ']' {
-					state = done_ks
+					state = doneKS
 				}
 			}
 			capture = make([]rune, 0, len(key)-idx)
-		} else if c == ' ' && state == space_ks {
-			// another space?  ignore.o
-		} else if c == '[' && state == space_ks {
+		} else if c == ' ' && state == spaceKS {
+			// another space?  ignore.
+		} else if c == '[' && state == spaceKS {
 			// If we just saw a space and now see a [, we know it's time to start
 			// accumulating kana.
-			state = kana_ks
+			state = kanaKS
 		} else {
 			// By default, we capture the character.
 			capture = append(capture, c)
 		}
 	}
-	if state == kanji_ks {
+	if state == kanjiKS {
 		kanji = append(kanji, string(capture))
 		capture = make([]rune, 0, 0)
-		state = done_ks
+		state = doneKS
 	}
 
-	if !(state == done_ks || state == space_ks) {
+	if !(state == doneKS || state == spaceKS) {
 		err = fmt.Errorf("not in done or space state (in %v) after parsing key %s", state, key)
 		return
 	}

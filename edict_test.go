@@ -11,8 +11,8 @@ import (
 func TestDetailString(t *testing.T) {
 	// I don't really care to test every combination, so I chose one
 	// arbitrarily to at least make sure String() works.
-	if Vs_c.String() != "vs-c" {
-		t.Error("Something is wrong with the part of speech map: Vs_c != vs-c")
+	if VsC.String() != "vs-c" {
+		t.Error("Something is wrong with the part of speech map: VsC != vs-c")
 	}
 }
 
@@ -24,58 +24,29 @@ func TestDetailFor(t *testing.T) {
 	}
 }
 
-func s(s string) *string {
-	return &s
-}
-
-func d(d Detail) *Detail {
-	return &d
-}
-
 func TestParseIdentifier(t *testing.T) {
 	testData := []struct {
-		input   string
-		detail  *Detail
-		xref    *string
-		unknown *string
+		input      string
+		class      identifierClass
+		identifier string
 	}{
-		{"42", nil, nil, nil},
-		{"See foo", nil, s("foo"), nil},
-		{"See あ・い", nil, s("あ・い"), nil},
-		{"n", d(N), nil, nil},
-		{"esp. ", nil, nil, s("esp. ")},
+		{"42", none, ""},
+		{"See foo", xref, "foo"},
+		{"See あ・い", xref, "あ・い"},
+		{"n", detail, "n"},
+		{"esp. ", text, "esp. "},
 	}
 
 	for _, test := range testData {
-		d, x, u := parseIdentifier(test.input)
+		class, identifier := parseIdentifier(test.input)
 
-		// details
-		if d != nil && test.detail == nil {
-			t.Errorf("parsing %s: got non-nil detail %s, wanted nil detail", test.input, *d)
-		} else if d == nil && test.detail != nil {
-			t.Errorf("parsing %s: got nil detail, wanted %s", test.input, *test.detail)
-		} else if d != nil && test.detail != nil && *d != *test.detail {
-			t.Errorf("parsing %s:  got detail %v\n  want detail %v", test.input, *d, *test.detail)
+		if class != test.class {
+			fmt.Errorf("class returned by parseIdentifier:\n   got: %s\n  want: %s", class, test.class)
 		}
 
-		// xrefs
-		if x != nil && test.xref == nil {
-			t.Errorf("parsing %s: got non-nil xref %s, wanted nil xref", test.input, *x)
-		} else if x == nil && test.xref != nil {
-			t.Errorf("parsing %s: got nil xref, wanted %s", test.input, *test.xref)
-		} else if x != nil && test.xref != nil && *x != *test.xref {
-			t.Errorf("parsing %s:  got detail %v\n  want detail %v", test.input, *x, *test.xref)
+		if identifier != test.identifier {
+			fmt.Errorf("identifier returned by parseIdentifier:\n   got: %s\n  want: %s", identifier, test.identifier)
 		}
-
-		// unknowns
-		if u != nil && test.unknown == nil {
-			t.Errorf("parsing %s: got non-nil unknown %s, wanted nil unknown", test.input, *u)
-		} else if u == nil && test.unknown != nil {
-			t.Errorf("parsing %s: got nil unknown, wanted %s", test.input, *test.unknown)
-		} else if u != nil && test.unknown != nil && *u != *test.unknown {
-			t.Errorf("parsing %s:  got detail %v\n  want detail %v", test.input, *u, *test.unknown)
-		}
-
 	}
 }
 
@@ -95,7 +66,7 @@ func TestParseGloss(t *testing.T) {
 		{
 			input:   "(n,adj-no) foo",
 			def:     "foo",
-			details: []Detail{N, Adj_no},
+			details: []Detail{N, AdjNo},
 			xrefs:   nil,
 		},
 		{
@@ -211,7 +182,7 @@ func TestParseKey(t *testing.T) {
 
 func TestFixKey(t *testing.T) {
 	testData := []struct {
-		in string
+		in  string
 		out string
 	}{
 		{"foo(bar) (baz) (quux)", "foo"},
